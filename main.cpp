@@ -15,7 +15,7 @@ struct hit_record {
     vec3 p;
     vec3 normal;
     float w_r;
-    //float w_t;
+    float w_t;
     //??
 };
 
@@ -57,6 +57,7 @@ bool sphere::hit(const ray& r, float tmin, float tmax, hit_record& rec) const {
             rec.normal = N;
             rec.p = r.point_at_parameter(t);
             rec.w_r = this->w_r;
+            rec.w_t = this->w_t;
         }
 
         return true;
@@ -111,9 +112,17 @@ int Intersect(vec3 p, vec3 d, hit_record& rec) //¨D¤@±ø¥ú½u¬O§_¦³¸ò¥ô¦óª«Åé¦³¥æÂ
 vec3 Reflect(vec3 q, vec3 n) //­pºâ¤Ï®g¥ú
 {
     vec3 r_in(-q.x(), -q.y(), -q.z());
+    r_in.make_unit_vector();
     vec3 r_out = (n * 2.0) * dot(n, r_in);
     r_out = r_out - r_in;
     return r_out;
+}
+
+vec3 Transmit(vec3 q, vec3 n) //­pºâ§é®g¥ú
+{
+    //vec3 r_in(-q.x(), -q.y(), -q.z());
+
+    //return r_out;
 }
 
 vec3 trace(vec3 p, vec3 d, int step)
@@ -139,7 +148,7 @@ vec3 trace(vec3 p, vec3 d, int step)
     q = ht.p;
     n = ht.normal; //or get from hit_record
     vec3 r = Reflect(q, n);
-    //t = transmit(q, n);
+    //vec3 t = Transmit(q, n);
     local = Shading(pointlight, lightintensity, ht);
     reflected = trace(q, r, step+1);
     //transmitted = trace(q, t, step+1);
@@ -150,7 +159,8 @@ vec3 trace(vec3 p, vec3 d, int step)
     //if(ht.w_r != 0.0)
     //    cout << reflected.x() << " , "<< reflected.y() << " , "<< reflected.z() << endl;
 
-    return(local*(1.0f - ht.w_r)+ reflected*ht.w_r+ transmitted*0.0);
+    return(local*(1.0f - ht.w_r)+ reflected*ht.w_r+ transmitted*0.0);//¥u¦³§é®g
+    //return(local*(1.0f - ht.w_r)+ reflected*ht.w_r+ transmitted*ht.w_t) * (1.0f - ht.w_t);
 }
 
 vec3 cal_color(const ray& r)
@@ -206,11 +216,14 @@ int main()
     //=======================================
 
     //====  ´ú¸Õ  ====================
-    sphere test_sphere(vec3(1.1, 0, -1.75), 0.5f, 1.0f, 0.0f);
+    sphere test_sphere(vec3(0, 0, -2), 0.5f, 0.0f, 0.9f);
     spheres.push_back(test_sphere);
 
-    sphere test_sphere2(vec3(0, 0, -1.75), 0.5f);
+    sphere test_sphere2(vec3(1, 0, -1.75), 0.5f, 0.9f);
     spheres.push_back(test_sphere2);
+
+    sphere test_sphere3(vec3(-1, 0, -2.25), 0.5f);
+    spheres.push_back(test_sphere3);
     //=======================================
 
     int width = 400;
