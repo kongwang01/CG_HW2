@@ -26,6 +26,8 @@ public:
     inline vec3 operator*(const float t);
     inline vec3 operator/(const float t);
 
+    inline vec3 operator*(const vec3 &v2);
+
     inline float length() const { return sqrt(e[0] * e[0] + e[1] * e[1] + e[2] * e[2]); }
     inline float squared_length() const { return e[0] * e[0] + e[1] * e[1] + e[2] * e[2]; }
     inline void make_unit_vector();
@@ -112,6 +114,16 @@ inline vec3 vec3::operator/(const float t)
     div.e[2] = this->z() / t;
 
     return div;
+}
+
+inline vec3 vec3::operator*(const vec3 &v2)
+{
+    vec3 vec_mul;
+    vec_mul.e[0] = this->x() * v2.x();
+    vec_mul.e[1] = this->y() * v2.y();
+    vec_mul.e[2] = this->z() * v2.z();
+
+    return vec_mul;
 }
 //================================================================
 

@@ -15,6 +15,7 @@ class ray
             return this->origin() + unit_dir * t;
         }
 
+    private:
         vec3 O;
         vec3 D;
 };
