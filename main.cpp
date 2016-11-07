@@ -118,22 +118,81 @@ vec3 Reflect(vec3 q, vec3 n) //計算反射光
     return r_out;
 }
 
+
 vec3 Transmit(vec3 q, vec3 n) //計算折射光
 {
-    //vec3 r_in(-q.x(), -q.y(), -q.z());
+    float eta = 1.0f/1.79f;
+    vec3 r_in(q.x(), q.y(), q.z());
+    r_in.make_unit_vector();
 
-    //return r_out;
+    float N_dot_I = dot(n, r_in);
+    float k = 1.0f - eta * eta * (1.0f - N_dot_I * N_dot_I);
+    vec3 r_out;
+    if (k < 0.0f)
+        r_out = vec3(0.0f, 0.0f, 0.0f);
+    else
+        r_out = r_in * eta - n * (eta * N_dot_I + sqrtf(k));
+
+    //cout << r_out.x() << " , "<< r_out.y() << " , "<< r_out.z() << endl;
+    return r_out;
 }
+
+/*
+vec3 Transmit(vec3 q, vec3 n)
+{
+    float n1, n2, eta;
+    vec3 r_in(q.x(), q.y(), q.z());
+    r_in.make_unit_vector();
+
+    float cosI = dot(n, r_in);
+    if(cosI > 0.0f)
+    {
+        n1 = 1.4f;
+        n2 = 1.0f;
+        n = vec3(-n.x(), -n.y(), -n.z());
+    }
+    else
+    {
+        n1 = 1.0f;
+        n2 = 1.4f;
+        cosI = -cosI;
+    }
+    eta = n1/n2;
+    float sinT2 = eta*eta * (1.0f - cosI * cosI);
+    float cosT = sqrt(1.0f - sinT2);
+    //fresnel equations
+    float rn = (n1 * cosI - n2 * cosT)/(n1 * cosI + n2 * cosT);
+    float rt = (n2 * cosI - n1 * cosT)/(n2 * cosI + n2 * cosT);
+    rn *= rn;
+    rt *= rt;
+    float refl = (rn + rt)*0.5f;
+    float trans = 1.0f - refl;
+
+    if(eta == 1.0f) //無折射?
+        return q;
+    if(cosT*cosT < 0.0f)//tot inner refl
+    {
+        refl = 1.0f;
+        trans = 0.0f;
+        //return calcReflectingRay(r, intersection, normal);
+        return Reflect(q, n);
+    }
+    vec3 dir = r_in * eta + n*(eta * cosI - cosT);
+    //return Ray(intersection + dir * BIAS, dir);
+    return dir;
+}
+*/
 
 vec3 trace(vec3 p, vec3 d, int step)
 {
+    //d.make_unit_vector();
     vec3 local, reflected, transmitted;
     vec3 q; //point
     vec3 n; //normal
 
-    if(step > 3)
-        //return vec3(0, 0, 0);//black or background
-        return SkyColor(p, d);
+    if(step > 5)
+        return vec3(0, 0, 0);//black or background
+        //return SkyColor(p, d);
 
     hit_record ht;
     ht.t = 0.0;
@@ -145,13 +204,17 @@ vec3 trace(vec3 p, vec3 d, int step)
     if(status == 0)
         return SkyColor(p, d);
 
+
     q = ht.p;
     n = ht.normal; //or get from hit_record
     vec3 r = Reflect(q, n);
-    //vec3 t = Transmit(q, n);
+    vec3 t;
+    if(ht.w_t != 0.0)
+        t = Transmit(q, n);
     local = Shading(pointlight, lightintensity, ht);
     reflected = trace(q, r, step+1);
-    //transmitted = trace(q, t, step+1);
+    if(ht.w_t != 0.0)
+        transmitted = trace(q, t, step+1);
 
     //cout << local.r() << " , "<< local.g() << " , "<< local.b() << endl;
     //return(w_l*local+ w_r*reflected+ w_t*transmitted);
@@ -159,8 +222,8 @@ vec3 trace(vec3 p, vec3 d, int step)
     //if(ht.w_r != 0.0)
     //    cout << reflected.x() << " , "<< reflected.y() << " , "<< reflected.z() << endl;
 
-    return(local*(1.0f - ht.w_r)+ reflected*ht.w_r+ transmitted*0.0);//只有折射
-    //return(local*(1.0f - ht.w_r)+ reflected*ht.w_r+ transmitted*ht.w_t) * (1.0f - ht.w_t);
+    //return(local*(1.0f - ht.w_r)+ reflected*ht.w_r+ transmitted*0.0);//只有折射
+    return(local*(1.0f - ht.w_r)+ reflected*ht.w_r) * (1.0f - ht.w_t)+ transmitted*ht.w_t;
 }
 
 vec3 cal_color(const ray& r)
@@ -186,7 +249,7 @@ vec3 cal_color(const ray& r)
 int main()
 {
     //====  隨機創造10顆球  ================
-    //srand((unsigned)time(0));
+    srand((unsigned)time(0));
     int temp_r = 0, temp_x = 0, temp_y = 0, temp_z = 0;
     //vector<sphere> spheres;
     /*for(int i = 0 ; i < 3 ; i++)//三大球
@@ -198,17 +261,17 @@ int main()
         vec3 temp_v3((float)temp_x,(float)temp_y,(float)temp_z);
         sphere temp_sphere(temp_v3, ((float)temp_r)/10.0);
         spheres.push_back(temp_sphere);
-    }
-    for(int i = 0 ; i < 7 ; i++)//剩下小球
+    }*/
+    for(int i = 0 ; i < 20 ; i++)//剩下小球
     {
         temp_r = rand()%10;
-        temp_x = rand()%30;
+        temp_x = rand()%60;
         temp_y = rand()%2;
-        temp_z = rand()%10;
-        vec3 temp_v3(((float)temp_x)-10.0,((float)temp_y)-5.0,(-((float)temp_z)-5.0));
-        sphere temp_sphere(temp_v3, ((float)temp_r)/10.0);
+        temp_z = rand()%30;
+        vec3 temp_v3((((float)temp_x)/10.0f)-3.0f, -0.4f,(((float)temp_z)/10.0f)-3.5f);
+        sphere temp_sphere(temp_v3, 0.1f);
         spheres.push_back(temp_sphere);
-    }*/
+    }
 
     //====  當作ground  ====================
     sphere ground_sphere(vec3(0, -100.5, -2), 100);
