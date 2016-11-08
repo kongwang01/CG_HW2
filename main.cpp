@@ -8,6 +8,9 @@
 
 using namespace std;
 
+vec3 colorlist[8] = { vec3(0.8, 0.3, 0.3), vec3(0.3, 0.8, 0.3), vec3(0.3, 0.3, 0.8),
+ vec3(0.8, 0.8, 0.3), vec3(0.3, 0.8, 0.8), vec3(0.8, 0.3, 0.8),
+ vec3(0.8, 0.8, 0.8), vec3(0.3, 0.3, 0.3) };
 vec3 pointlight(-10, 10, 0);
 vec3 lightintensity(1, 1, 1);
 
@@ -17,19 +20,22 @@ struct hit_record {
     vec3 normal;
     float w_r;
     float w_t;
+    vec3 matColor;
 };
 
 class sphere{
     public:
     sphere() {}
     //sphere(vec3 c, float r) : center(c), radius(r) {};
-    sphere(vec3 c, float r, float w_ri=0.0f, float w_ti=0.0f) : center(c), radius(r), w_r(w_ri), w_t(w_ti) {};
+    //sphere(vec3 c, float r, float w_ri=0.0f, float w_ti=0.0f) : center(c), radius(r), w_r(w_ri), w_t(w_ti) {};
+    sphere(vec3 c, float r, vec3 m_c, float w_ri=0.0f, float w_ti=0.0f) : center(c), radius(r), material_color(m_c), w_r(w_ri), w_t(w_ti) {};
     bool hit(const ray& r, float tmin, float tmax, hit_record& rec) const;
 
     vec3 center;
     float radius;
     float w_r;
     float w_t;
+    vec3 material_color;
 };
 
 bool sphere::hit(const ray& r, float tmin, float tmax, hit_record& rec) const {
@@ -58,6 +64,7 @@ bool sphere::hit(const ray& r, float tmin, float tmax, hit_record& rec) const {
             rec.p = r.point_at_parameter(t);
             rec.w_r = this->w_r;
             rec.w_t = this->w_t;
+            rec.matColor = this->material_color;
         }
 
         return true;
@@ -92,7 +99,6 @@ int Intersect(vec3 p, vec3 d, hit_record& rec) //¨D¤@±ø¥ú½u¬O§_¦³¸ò¥ô¦óª«Åé¦³¥æÂ
 
     if(rec.t != 0.0) //¥Nªí¦¹¥ú½ur¸ò¬Y­Óª«Åé¦³¸I¼²
     {
-        //return Shading(pointlight, lightintensity, ht);
         return 1;
     }
     else
@@ -118,9 +124,7 @@ vec3 Shading(vec3 lightposition,vec3 lightintensity, hit_record& rec)
     if(temp_rec.t != 0.0)
         return vec3(0,0,0);
     else
-        return I * max(float(0.0) ,dot(L,rec.normal));
-
-    //return color;
+        return I * max(float(0.0) ,dot(L,rec.normal))*rec.matColor;
 }
 
 vec3 Reflect(vec3 q, vec3 n) //­pºâ¤Ï®g¥ú
@@ -151,22 +155,18 @@ vec3 Transmit(vec3 q, vec3 n) //­pºâ§é®g¥ú
 
 vec3 trace(vec3 p, vec3 d, int step)
 {
-    //d.make_unit_vector();
     vec3 local, reflected, transmitted;
     vec3 q; //point
     vec3 n; //normal
 
     if(step > 5)
         return vec3(0, 0, 0);//black or background
-        //return SkyColor(p, d);
 
     hit_record ht;
     ht.t = 0.0;
 
     int status = Intersect(p, d, ht);
 
-    //if(status==light_source)
-        //return(light_source_color);
     if(status == 0)
         return SkyColor(p, d);
 
@@ -178,7 +178,6 @@ vec3 trace(vec3 p, vec3 d, int step)
     reflected = trace(q, r, step+1);
     transmitted = trace(q, t, step+1);
 
-    //return(local*(1.0f - ht.w_r)+ reflected*ht.w_r+ transmitted*0.0);//¥u¦³§é®g
     return(local*(1.0f - ht.w_r)+ reflected*ht.w_r) * (1.0f - ht.w_t)+ transmitted*ht.w_t;
 }
 
@@ -186,45 +185,44 @@ int main()
 {
     //====  ÀH¾÷³Ð³y10Áû²y  ================
     srand((unsigned)time(0));
-    int temp_r = 0, temp_x = 0, temp_y = 0, temp_z = 0;
-    //vector<sphere> spheres;
-    /*for(int i = 0 ; i < 3 ; i++)//¤T¤j²y
-    {
-        temp_r = 30;
-        temp_x = -7 + (i*7);
-        temp_y = 0;
-        temp_z = -10;
-        vec3 temp_v3((float)temp_x,(float)temp_y,(float)temp_z);
-        sphere temp_sphere(temp_v3, ((float)temp_r)/10.0);
-        spheres.push_back(temp_sphere);
-    }*/
-    for(int i = 0 ; i < 20 ; i++)//³Ñ¤U¤p²y
+    int temp_r = 0, temp_x = 0, temp_y = 0, temp_z = 0, cindex = 0;
+    sphere temp_sphere;
+    for(int i = 0 ; i < 20 ; i++)//¤p²y
     {
         temp_r = rand()%10;
         temp_x = rand()%60;
         temp_y = rand()%2;
         temp_z = rand()%30;
+        cindex = rand() % 8;
+        float rand_reflec = ((float)rand() / (float)(RAND_MAX));
+        float rand_refrac = ((float)rand() / (float)(RAND_MAX));
         vec3 temp_v3((((float)temp_x)/10.0f)-3.0f, -0.4f,(((float)temp_z)/10.0f)-3.5f);
-        sphere temp_sphere(temp_v3, 0.1f);
+        if((i%8) == 0)
+            temp_sphere = sphere(temp_v3, 0.1f, colorlist[cindex], 0.0f, rand_refrac);
+        else if((i%9) == 0)
+            temp_sphere = sphere(temp_v3, 0.1f, colorlist[cindex], rand_reflec);
+        else
+            temp_sphere = sphere(temp_v3, 0.1f, colorlist[cindex]);
+
         spheres.push_back(temp_sphere);
     }
 
     //====  ·í§@ground  ====================
-    sphere ground_sphere(vec3(0, -100.5, -2), 100);
+    sphere ground_sphere(vec3(0, -100.5, -2), 100, vec3(1.0f, 1.0f, 1.0f));
     spheres.push_back(ground_sphere);
     //=======================================
 
-    //====  ´ú¸Õ  ====================
-    sphere test_sphere(vec3(0, 0, -2), 0.5f, 0.0f, 0.9f);
+    //====  ¤j²y´ú¸Õ  ====================
+    sphere test_sphere(vec3(0, 0, -2), 0.5f, vec3(1.0f, 1.0f, 1.0f), 0.0f, 0.9f);
     spheres.push_back(test_sphere);
 
-    sphere test_sphere2(vec3(1, 0, -1.75), 0.5f, 0.9f);
+    sphere test_sphere2(vec3(1, 0, -1.75), 0.5f, vec3(1.0f, 1.0f, 1.0f), 0.9f);
     spheres.push_back(test_sphere2);
 
-    sphere test_sphere3(vec3(-1, 0, -2.25), 0.5f);
+    sphere test_sphere3(vec3(-1, 0, -2.25), 0.5f, vec3(0.2f, 0.2f, 0.7f));
     spheres.push_back(test_sphere3);
 
-    sphere test_sphere4(vec3(0, 0, -4), 0.1f);
+    sphere test_sphere4(vec3(0, 0, -4), 0.1f, vec3(1.0f, 1.0f, 1.0f));
     spheres.push_back(test_sphere4);
     //=======================================
 
@@ -236,30 +234,8 @@ int main()
     vec3 horizontal(4, 0, 0);
     vec3 vertical(0, 2, 0);
 
-    //=========  ¿é¥XppmÀÉ  ================================
-    /*fstream file;
-    file.open("ray.ppm", ios::out);
-    file << "P3\n" << width << " " << height << "\n255\n";
-    for (int j = height - 1; j >= 0; j--) {
-        for (int i = 0; i < width; i++) {
-        float u = float(i) / float(width);
-        float v = float(j) / float(height);
-        ray r(origin, lower_left_corner + horizontal*u + vertical*v);
-        //vec3 color = cal_color(r);
-        vec3 color = trace(r.origin(), r.direction(), 0);
-
-            file << int(color.r() * 255) << " " << int(color.g()  * 255) << " " << int(color.b() * 255) << "\n";
-        }
-    }*/
-    //=========================================================
     //========  ¿é¥XbmpÀÉ  ====================================
-    //char* pFilename="54.ppm";
-    //ifstream ifile;//input ppm file
     ofstream ofile;//output bmp file
-    //ifile.open(pFilename,ios::binary);
-    //if (!ifile) {
-    //    cout<<"open error!"<<endl;
-    //}
     ofile.open("rayBMP.bmp",ios::binary);
 
 
@@ -267,16 +243,11 @@ int main()
     int Width=width,Height=height,Count = 255;
     //int Width,Height,Count;//count is the number of pixels
     int DataSize,HeadSize,FileSize;
-    //ifile>>FileType>>Width>>Height>>Count;//get the para of the ppm file
-
-    //cout<<FileType<<"!"<<Width<<"!"<<Height<<endl;
 
     DataSize=Width*Height*3;//every pixel need 3 byte to store
     HeadSize=0x36;//54 Bype
     FileSize=HeadSize+DataSize;
     Count=Width*Height;
-
-    //cout<<Count<<endl;
 
 
     unsigned char BmpHead[54];
@@ -287,7 +258,6 @@ int main()
 
     BmpHead[0]=0x42;
     BmpHead[1]=0x4D;//type
-    //cout<<FileSize<<endl;
 
     int SizeNum=2;//the size of bmp file
     while (FileSize!=0) {
@@ -295,7 +265,6 @@ int main()
         FileSize = FileSize / 256;
     }
 
-    //cout<<BmpHead[2]<<BmpHead[3]<<BmpHead[4]<<BmpHead[5]<<endl;
 
     BmpHead[0x0A]=0x36;//data begin here
     BmpHead[0x0E]=0x28;//size of bitmap information head
@@ -329,26 +298,11 @@ int main()
     int i,j;
 
     for (i=0; i<54; i++)
-    {ofile << BmpHead[i];
-     //cout<<BmpHead[i]<<endl;
+    {
+        ofile << BmpHead[i];
     }
 
     char blue,green,red;
-
-    //ifile.ignore();
-    //cout<<"ok" <<Count<<endl;
-    /*for(int j = Count;j >=1 ;j--){
-        //cout<<"begin"<<endl;
-        ifile.get(blue);
-        ifile.get(green);
-        ifile.get(red);
-
-        ofile<<hex;
-        ofile.put(red);
-        ofile.put(green);
-        ofile.put(blue);
-        //cout<<j<<endl;
-    }*/
 
     for (int j = 0; j < height; j++) {
         for (int i = 0; i < width; i++) {
@@ -356,6 +310,7 @@ int main()
         float v = float(j) / float(height);
         ray r(origin, lower_left_corner + horizontal*u + vertical*v);
         vec3 color = trace(r.origin(), r.direction(), 0);
+        //cout << color.r() << " , " << color.g() << " , " << color.b() << endl;
 
         blue = static_cast<char>(int(color.r() * 255));
         green= static_cast<char>(int(color.g() * 255));
@@ -368,7 +323,6 @@ int main()
         }
     }
 
-    //ifile.close();
     ofile.close();
     //======================================================
 
