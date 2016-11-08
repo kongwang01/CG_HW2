@@ -16,7 +16,6 @@ struct hit_record {
     vec3 normal;
     float w_r;
     float w_t;
-    //??
 };
 
 class sphere{
@@ -46,7 +45,7 @@ bool sphere::hit(const ray& r, float tmin, float tmax, hit_record& rec) const {
     {
         D = sqrt(D/4.0);
         t = -dotOCD - D;
-        //cout << t << endl;
+
         if(((t > tmin) && (rec.t > t)) || ((t > tmin) && (rec.t == 0.0)))
         {
             vec3 N = r.point_at_parameter(t);
@@ -69,14 +68,6 @@ bool sphere::hit(const ray& r, float tmin, float tmax, hit_record& rec) const {
     }
 }
 vector<sphere> spheres;
-
-vec3 Shading(vec3 lightposition,vec3 lightintensity, hit_record& rec)
-{
-    vec3 L = lightposition - rec.p;
-    L.make_unit_vector();
-    vec3 I = lightintensity;//intensity of lightsource
-    return I * max(float(0.0) ,dot(L,rec.normal))  ;
-}
 
 vec3 SkyColor(vec3 p, vec3 d)
 {
@@ -109,6 +100,28 @@ int Intersect(vec3 p, vec3 d, hit_record& rec) //¨D¤@±ø¥ú½u¬O§_¦³¸ò¥ô¦óª«Åé¦³¥æÂ
     }
 }
 
+vec3 Shading(vec3 lightposition,vec3 lightintensity, hit_record& rec)
+{
+    vec3 L = lightposition - rec.p;
+    L.make_unit_vector();
+    vec3 I = lightintensity;//intensity of lightsource
+
+    hit_record temp_rec;
+    temp_rec.t = 0.0;
+    ray shadow_ray((rec.p+ L*0.0001), L);
+    for (int i = 0; i < spheres.size() ; i++) //´M§ä¸ÓÂI©M¥ú·½¤§¶¡¬O§_¦³»ÙÃªª«
+    {
+        spheres[i].hit(shadow_ray, 0.01, 1000.0, temp_rec);
+    }
+
+    if(temp_rec.t != 0.0)
+        return vec3(0,0,0);
+    else
+        return I * max(float(0.0) ,dot(L,rec.normal));
+
+    //return color;
+}
+
 vec3 Reflect(vec3 q, vec3 n) //­pºâ¤Ï®g¥ú
 {
     vec3 r_in(-q.x(), -q.y(), -q.z());
@@ -117,7 +130,6 @@ vec3 Reflect(vec3 q, vec3 n) //­pºâ¤Ï®g¥ú
     r_out = r_out - r_in;
     return r_out;
 }
-
 
 vec3 Transmit(vec3 q, vec3 n) //­pºâ§é®g¥ú
 {
@@ -133,55 +145,8 @@ vec3 Transmit(vec3 q, vec3 n) //­pºâ§é®g¥ú
     else
         r_out = r_in * eta - n * (eta * N_dot_I + sqrtf(k));
 
-    //cout << r_out.x() << " , "<< r_out.y() << " , "<< r_out.z() << endl;
     return r_out;
 }
-
-/*
-vec3 Transmit(vec3 q, vec3 n)
-{
-    float n1, n2, eta;
-    vec3 r_in(q.x(), q.y(), q.z());
-    r_in.make_unit_vector();
-
-    float cosI = dot(n, r_in);
-    if(cosI > 0.0f)
-    {
-        n1 = 1.4f;
-        n2 = 1.0f;
-        n = vec3(-n.x(), -n.y(), -n.z());
-    }
-    else
-    {
-        n1 = 1.0f;
-        n2 = 1.4f;
-        cosI = -cosI;
-    }
-    eta = n1/n2;
-    float sinT2 = eta*eta * (1.0f - cosI * cosI);
-    float cosT = sqrt(1.0f - sinT2);
-    //fresnel equations
-    float rn = (n1 * cosI - n2 * cosT)/(n1 * cosI + n2 * cosT);
-    float rt = (n2 * cosI - n1 * cosT)/(n2 * cosI + n2 * cosT);
-    rn *= rn;
-    rt *= rt;
-    float refl = (rn + rt)*0.5f;
-    float trans = 1.0f - refl;
-
-    if(eta == 1.0f) //µL§é®g?
-        return q;
-    if(cosT*cosT < 0.0f)//tot inner refl
-    {
-        refl = 1.0f;
-        trans = 0.0f;
-        //return calcReflectingRay(r, intersection, normal);
-        return Reflect(q, n);
-    }
-    vec3 dir = r_in * eta + n*(eta * cosI - cosT);
-    //return Ray(intersection + dir * BIAS, dir);
-    return dir;
-}
-*/
 
 vec3 trace(vec3 p, vec3 d, int step)
 {
@@ -204,47 +169,17 @@ vec3 trace(vec3 p, vec3 d, int step)
     if(status == 0)
         return SkyColor(p, d);
 
-
     q = ht.p;
     n = ht.normal; //or get from hit_record
-    vec3 r = Reflect(q, n);
-    vec3 t;
-    if(ht.w_t != 0.0)
-        t = Transmit(q, n);
+    vec3 r = Reflect(q, n); //­pºâ¤Ï®g¥ú
+    vec3 t = Transmit(q, n); //­pºâ§é®g¥ú
     local = Shading(pointlight, lightintensity, ht);
     reflected = trace(q, r, step+1);
-    if(ht.w_t != 0.0)
-        transmitted = trace(q, t, step+1);
-
-    //cout << local.r() << " , "<< local.g() << " , "<< local.b() << endl;
-    //return(w_l*local+ w_r*reflected+ w_t*transmitted);
-
-    //if(ht.w_r != 0.0)
-    //    cout << reflected.x() << " , "<< reflected.y() << " , "<< reflected.z() << endl;
+    transmitted = trace(q, t, step+1);
 
     //return(local*(1.0f - ht.w_r)+ reflected*ht.w_r+ transmitted*0.0);//¥u¦³§é®g
     return(local*(1.0f - ht.w_r)+ reflected*ht.w_r) * (1.0f - ht.w_t)+ transmitted*ht.w_t;
 }
-
-vec3 cal_color(const ray& r)
-{
-    hit_record ht;
-    ht.t = 0.0;
-
-    for (int i = 0; i < spheres.size() ; i++) //´M§ä¸ò¥ú½ur¦³¥æÂIªºª«Åé¤§¤¤¡A³Ìªñªº¨º­Ó
-    {
-        spheres[i].hit(r, 0.01, 1000.0, ht);
-    }
-
-    if(ht.t != 0.0) //¥Nªí¦¹¥ú½ur¸ò¬Y­Óª«Åé¦³¸I¼²
-    {
-        //return Shading(pointlight, lightintensity, ht);
-        return trace(r.origin(), r.direction(), 0);
-    }
-
-    return SkyColor(r.origin(), r.direction()); //¥ú½u¨S¸I¨ì¥ô¦óª«Åé¡A¦^¶Ç¤ÑªÅ­I´º
-}
-
 
 int main()
 {
@@ -296,7 +231,7 @@ int main()
     file.open("ray.ppm", ios::out);
 
     vec3 lower_left_corner(-2, -1, -1);
-    vec3 origin(0, 0, 1);
+    vec3 origin(0, 0, 0);
     vec3 horizontal(4, 0, 0);
     vec3 vertical(0, 2, 0);
     file << "P3\n" << width << " " << height << "\n255\n";
@@ -305,7 +240,8 @@ int main()
         float u = float(i) / float(width);
         float v = float(j) / float(height);
         ray r(origin, lower_left_corner + horizontal*u + vertical*v);
-        vec3 color = cal_color(r);
+        //vec3 color = cal_color(r);
+        vec3 color = trace(r.origin(), r.direction(), 0);
 
             file << int(color.r() * 255) << " " << int(color.g()  * 255) << " " << int(color.b() * 255) << "\n";
         }
